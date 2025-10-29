@@ -10,7 +10,6 @@ import (
 	"golang.org/x/term"
 )
 
-// ReadWAVMono opens a WAV file and returns mono float64 samples normalized to [-1,1] and the sample rate.
 func ReadWAVMono(path string) ([]float64, uint32, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -31,7 +30,6 @@ func ReadWAVMono(path string) ([]float64, uint32, error) {
 	numCh := dec.Format().NumChannels
 	bits := dec.BitDepth
 	if bits == 0 {
-		// default to 16 if unknown
 		bits = 16
 	}
 
@@ -39,10 +37,9 @@ func ReadWAVMono(path string) ([]float64, uint32, error) {
 		return nil, dec.SampleRate, nil
 	}
 
-	// mix to mono and convert to float64 in [-1,1]
 	frameCount := len(buf.Data) / numCh
 	out := make([]float64, frameCount)
-	denom := int(1 << (bits - 1)) // signed PCM
+	denom := int(1 << (bits - 1))
 	for i := 0; i < frameCount; i++ {
 		sum := 0
 		for c := 0; c < numCh; c++ {
@@ -71,12 +68,9 @@ func normalize(s []float64) {
 	}
 }
 
-// RenderBraille renders waveform using Unicode Braille characters.
-// height is the number of character rows (each char row = 4 subpixels vertically).
 func RenderBraille(samples []float64, sampleRate, charRows int, w io.Writer) error {
 	cols, rows, err := term.GetSize(0)
 	if err != nil {
-		// fallback to typical size
 		cols, rows = 80, 24
 	}
 
@@ -92,10 +86,9 @@ func RenderBraille(samples []float64, sampleRate, charRows int, w io.Writer) err
 
 	grid := make([][]byte, charRows)
 	for i := range grid {
-		grid[i] = make([]byte, cols) // bitmask for braille dots
+		grid[i] = make([]byte, cols)
 	}
 
-	// Map samples into pixelWidth columns by averaging blocks
 	total := len(samples)
 	if total == 0 {
 		return nil
@@ -105,7 +98,6 @@ func RenderBraille(samples []float64, sampleRate, charRows int, w io.Writer) err
 		block = 1
 	}
 
-	// Precompute positions
 	center := float64(pixelHeight-1) / 2.0
 	positions := make([]int, pixelWidth)
 	for x := 0; x < pixelWidth; x++ {
@@ -123,7 +115,6 @@ func RenderBraille(samples []float64, sampleRate, charRows int, w io.Writer) err
 			sum += samples[i]
 		}
 		avg := sum / float64(end-start)
-		// map to pixel row (0..pixelHeight-1), top=0
 		y := center - avg*(float64(pixelHeight)/2.0)
 		if y < 0 {
 			y = 0
@@ -134,13 +125,11 @@ func RenderBraille(samples []float64, sampleRate, charRows int, w io.Writer) err
 		positions[x] = int(math.Round(y))
 	}
 
-	// Braille bit layout:
-	// rows (0..3) x cols (0..1) -> bit value
 	bits := [][]byte{
-		{0x01, 0x08}, // row0: dot1, dot4
-		{0x02, 0x10}, // row1: dot2, dot5
-		{0x04, 0x20}, // row2: dot3, dot6
-		{0x40, 0x80}, // row3: dot7, dot8
+		{0x01, 0x08},
+		{0x02, 0x10},
+		{0x04, 0x20},
+		{0x40, 0x80},
 	}
 
 	for px := 0; px < pixelWidth; px++ {
@@ -158,7 +147,6 @@ func RenderBraille(samples []float64, sampleRate, charRows int, w io.Writer) err
 		grid[charRow][xChar] |= bits[subrow][xSub]
 	}
 
-	// Render
 	base := rune(0x2800)
 	for r := 0; r < charRows; r++ {
 		line := make([]rune, cols)
@@ -177,7 +165,6 @@ func RenderBraille(samples []float64, sampleRate, charRows int, w io.Writer) err
 	return nil
 }
 
-// RenderASCII renders a simple ASCII/blocks waveform (centered).
 func RenderASCII(samples []float64, sampleRate, charRows int, w io.Writer) error {
 	cols, rows, err := term.GetSize(0)
 	if err != nil {
@@ -190,11 +177,9 @@ func RenderASCII(samples []float64, sampleRate, charRows int, w io.Writer) error
 		}
 	}
 
-	// We'll allocate rows x cols canvas
 	canvasRows := charRows
 	canvasCols := cols
 
-	// chunk samples into cols
 	total := len(samples)
 	chunk := total / canvasCols
 	if chunk < 1 {
@@ -221,7 +206,6 @@ func RenderASCII(samples []float64, sampleRate, charRows int, w io.Writer) error
 	}
 
 	mid := canvasRows / 2
-	// build canvas
 	canvas := make([][]rune, canvasRows)
 	for r := range canvas {
 		canvas[r] = make([]rune, canvasCols)
